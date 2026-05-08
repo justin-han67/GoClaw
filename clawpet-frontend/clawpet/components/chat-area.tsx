@@ -78,20 +78,8 @@ export function ChatArea({ chat, layoutMode = "full" }: ChatAreaProps) {
   const isUltra = layoutMode === "ultra"
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const {
-    isListening,
-    isSupported: isVoiceInputSupported,
-    toggleListening,
-  } = useVoiceInput({
-    onResult: (text) => {
-      setMessage((prev) => `${prev}${prev ? " " : ""}${text}`.trim())
-    },
-    onError: (voiceError) => {
-      console.warn("[petclaw] voice input error", voiceError)
-    },
-  })
-
-  const {
     messages,
+    activeSessionId,
     isConnected,
     isTyping,
     isTurnActive,
@@ -102,6 +90,22 @@ export function ChatArea({ chat, layoutMode = "full" }: ChatAreaProps) {
     reconnect,
     clearError,
   } = chat
+
+  const {
+    isListening,
+    isSupported: isVoiceInputSupported,
+    phase: voicePhase,
+    error: voiceError,
+    unavailableReason: voiceUnavailableReason,
+    toggleListening,
+  } = useVoiceInput({
+    canRecord: isConnected,
+    sessionKey: activeSessionId,
+    onResult: sendMessage,
+    onError: (voiceInputError) => {
+      console.warn("[petclaw] voice input error", voiceInputError)
+    },
+  })
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -396,7 +400,7 @@ export function ChatArea({ chat, layoutMode = "full" }: ChatAreaProps) {
 
               <button
                 onClick={toggleListening}
-                disabled={!isVoiceInputSupported}
+                disabled={!isVoiceInputSupported || Boolean(voiceUnavailableReason)}
                 className={cn(
                   "flex items-center justify-center border border-white/80 bg-white/82 text-[#70563f] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40",
                   isUltra ? "h-9 w-9 rounded-xl" : "h-11 w-11 rounded-2xl",
@@ -407,7 +411,7 @@ export function ChatArea({ chat, layoutMode = "full" }: ChatAreaProps) {
                   isVoiceInputSupported
                     ? isListening
                       ? "停止语音输入"
-                      : "开始语音输入"
+                      : voiceUnavailableReason || "开始语音输入"
                     : "当前环境不支持语音输入"
                 }
               >
@@ -441,6 +445,25 @@ export function ChatArea({ chat, layoutMode = "full" }: ChatAreaProps) {
                 </Button>
               )}
             </div>
+            {(voicePhase === "recording" ||
+              voicePhase === "recognizing" ||
+              voiceUnavailableReason ||
+              voiceError) && (
+              <div className="mt-2 px-1 text-sm">
+                {voicePhase === "recording" && (
+                  <div className="text-amber-700">录音中...</div>
+                )}
+                {voicePhase === "recognizing" && (
+                  <div className="text-[#7b5b3f]">语音识别中...</div>
+                )}
+                {voiceError && (
+                  <div className="text-rose-700">{voiceError}</div>
+                )}
+                {!voiceError && voiceUnavailableReason && (
+                  <div className="text-[#7b5b3f]">{voiceUnavailableReason}</div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

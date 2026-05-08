@@ -15,8 +15,6 @@ import {
 
 const SESSIONS_STORAGE_KEY = "petclaw_sessions"
 const ACTIVE_SESSION_KEY = "petclaw_active_session"
-const PPT_SKILL_NAME = "student-ppt-pet"
-const PPT_TRIGGER_RE = /(\bppt\b|PPT|幻灯片|答辩|汇报|开题|课件)/i
 
 export interface UseChatOptions {
   onMessage?: (message: ChatMessage) => void
@@ -206,14 +204,7 @@ function mergeMessage(
 }
 
 function buildOutgoingMessage(raw: string): string {
-  const text = raw.trim()
-  if (text.startsWith("/")) {
-    return text
-  }
-  if (!PPT_TRIGGER_RE.test(text)) {
-    return text
-  }
-  return `/use ${PPT_SKILL_NAME} ${text}`
+  return raw.trim()
 }
 
 function decodeBase64Chunk(value: string): Uint8Array | null {
@@ -826,7 +817,8 @@ export function useChat(options: UseChatOptions = {}): UseChatResult {
     try {
       await wsRef.current.connect()
     } catch (err) {
-      setError("连接失败")
+      const message = err instanceof Error ? err.message : "连接失败"
+      setError(message)
       console.error("WebSocket connection failed:", err)
     }
   }, [])
@@ -1082,18 +1074,28 @@ export function useChat(options: UseChatOptions = {}): UseChatResult {
         timestamp: Date.now(),
       }
 
-      updateSessionMessages(activeSessionIdRef.current, (prev) => [
-        ...prev,
-        userMessage,
-      ])
-      clearPendingBubbleTimer()
-      assistantTurnActiveRef.current = true
-      setIsTyping(true)
-      setIsTurnActive(true)
-      setToolStatus("idle")
-      setError(null)
+      try {
+        updateSessionMessages(activeSessionIdRef.current, (prev) => [
+          ...prev,
+          userMessage,
+        ])
+        clearPendingBubbleTimer()
+        assistantTurnActiveRef.current = true
+        setIsTyping(true)
+        setIsTurnActive(true)
+        setToolStatus("idle")
+        setError(null)
 
-      wsRef.current.send(outbound, activeSessionIdRef.current)
+        wsRef.current.send(outbound, activeSessionIdRef.current)
+      } catch (err) {
+        assistantTurnActiveRef.current = false
+        setIsTyping(false)
+        setIsTurnActive(false)
+        setToolStatus("idle")
+        const message = err instanceof Error ? err.message : "发送消息失败，请重试"
+        setError(message)
+        console.error("[petclaw] sendMessage failed:", err)
+      }
     },
     [clearPendingBubbleTimer, updateSessionMessages],
   )

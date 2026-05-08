@@ -14,6 +14,7 @@
   "build": {
     "appId": "com.goclaw.clawpet",
     "productName": "ClawPet",
+    "beforePack": "electron/before-pack.js",
     "directories": {
       "output": "dist"
     },
@@ -49,6 +50,14 @@
         }
       ],
       "signAndEditExecutable": false
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "zip"
+        }
+      ],
+      "category": "public.app-category.entertainment"
     }
   },
   "dependencies": {
